@@ -334,7 +334,6 @@ impl<R: Iterator<Item = Result<Event, std::io::Error>>, W: Write> Game<R, W> {
 
     //FEN helper functions
     fn create_fen_string(&mut self) -> String {
-
         let mut fen: String = "".to_string();
         let mut empty_count: usize = 0;
         let mut piece_char: char;
@@ -423,21 +422,31 @@ impl<R: Iterator<Item = Result<Event, std::io::Error>>, W: Write> Game<R, W> {
     }
 
     fn display_fen_string(&mut self) {
-        let fen = self.create_fen_string();        
+        let fen = self.create_fen_string();
         write!(
             self.stdout,
             "{}{}{}{}{}",
             termion::cursor::Goto(1, 12),
-            termion::clear::CurrentLine,
+            termion::clear::AfterCursor,
             color::Bg(color::Green),
             fen,
             style::Reset
         )
         .unwrap();
         self.reset_cursor();
+    }
 
+    fn copy_fen_to_clipboard(&mut self) {
         let mut ctx: ClipboardContext = ClipboardProvider::new().unwrap();
-        ctx.set_contents(fen.to_owned()).unwrap();
+        ctx.set_contents(self.create_fen_string().to_owned())
+            .unwrap();
+        write!(
+            self.stdout,
+            "{}Copied FEN string to clipboard!",
+            termion::cursor::Goto(1, 13)
+        )
+        .unwrap();
+        self.stdout.flush().unwrap();
     }
 
     // Valid move finder helper functions
@@ -1288,6 +1297,11 @@ impl<R: Iterator<Item = Result<Event, std::io::Error>>, W: Write> Game<R, W> {
                     } else {
                         self.show_fen = true;
                         self.display_fen_string()
+                    }
+                }
+                Event::Key(Key::Char('c')) => {
+                    if self.show_fen {
+                        self.copy_fen_to_clipboard();
                     }
                 }
                 Event::Key(Key::Char('q')) => {
