@@ -77,6 +77,8 @@ struct Game<R, W> {
     king_coords: [[usize; 2]; 2],
     moves: Vec<[usize; 2]>,
     show_fen: bool,
+    halfmove_clock: usize,
+    fullmoves: usize,
     stdout: W,
     stdin: R,
 }
@@ -193,6 +195,8 @@ fn init_game<R: Read, W: Write>(stdout: W, stdin: R) {
         en_passant: vec![],
         moves: Vec::new(),
         show_fen: false,
+        halfmove_clock: 0,
+        fullmoves: 1,
         stdout,
         stdin: stdin.events(),
     };
@@ -927,6 +931,7 @@ impl<R: Iterator<Item = Result<Event, std::io::Error>>, W: Write> Game<R, W> {
     //Terminal output helper functions
     fn handle_click_or_enter(&mut self, state: &mut KeyCaptureState) {
         if self.board[self.y][self.x].is_valid_move {
+            self.update_halfmove_clock();
             self.update_en_passant_capture();
             self.update_en_passant_field();
             self.update_castling_rights();
@@ -1051,6 +1056,7 @@ impl<R: Iterator<Item = Result<Event, std::io::Error>>, W: Write> Game<R, W> {
     fn update_turn(&mut self) {
         if self.turn == 0 {
             self.turn = 1;
+            self.fullmoves += 1;
         } else {
             self.turn = 0;
         }
@@ -1108,6 +1114,18 @@ impl<R: Iterator<Item = Result<Event, std::io::Error>>, W: Write> Game<R, W> {
         }
 
         self.king_coords[self.turn] = [self.x, self.y];
+    }
+
+    fn update_halfmove_clock(&mut self) {
+        let sel_x = self.selected_piece[0];
+        let sel_y = self.selected_piece[1];
+        if self.board[sel_y][sel_x].piece == Piece::Pawn
+            || self.board[self.y][self.x].piece != Piece::Empty
+        {
+            self.halfmove_clock = 0;
+        } else {
+            self.halfmove_clock += 1;
+        }
     }
 
     fn check_for_mate(&mut self) {
