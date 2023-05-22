@@ -422,6 +422,12 @@ impl<R: Iterator<Item = Result<Event, std::io::Error>>, W: Write> Game<R, W> {
             );
         }
 
+        fen += &format!(
+            " {} {}",
+            &self.halfmove_clock.to_string(),
+            &self.fullmoves.to_string()
+        );
+
         fen
     }
 
