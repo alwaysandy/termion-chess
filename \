@@ -1,0 +1,226 @@
+extern crate termion;
+
+use termion::{color, style};
+use termion::raw::IntoRawMode;
+
+use std::io::{Write, stdout, stdin, Read};
+
+
+enum Piece {
+    King,
+    Queen,
+    Rook,
+    Bishop,
+    Knight,
+    Pawn,
+    Empty
+}
+
+enum Move {
+    U,
+    D,
+    R,
+    L,
+    UL,
+    DL,
+    UR,
+    DR,
+    KnUR,
+    KnUL,
+    KnDR,
+    KnDL
+}
+
+struct Square {
+    icon: char,
+    color: char,
+    piece: Piece,
+    moves: Vec<Move>,
+    first_move: bool,
+    en_passant: bool,
+}
+
+impl Square {
+    pub fn new(piece: Piece, color: char) -> Self {
+        Self {
+            icon: match piece {
+                Piece::King => if color == 'w' {'♔'} else {'♚'},
+                Piece::Queen => if color == 'w' {'♕'} else {'♛'},
+                Piece::Rook => if color == 'w' {'♖'} else {'♜'},
+                Piece::Bishop => if color == 'w' {'♗'} else {'♝'},
+                Piece::Knight => if color == 'w' {'♘'} else {'♞'},
+                Piece::Pawn => if color == 'w' {'\u{2659}'} else {'\u{265F}'},
+                _ => ' ', 
+            },
+            moves: match piece {
+                Piece::King => vec![
+                    Move::U, Move::D, Move::L, Move::R, Move::UR, Move::UL, 
+                    Move::DR, Move::DL
+                ],
+                Piece::Queen => vec![
+                    Move::U, Move::D, Move::L, Move::R, Move::UR, Move::UL, 
+                    Move::DR, Move::DL
+                ],
+                Piece::Rook => vec![
+                    Move::U, Move::D, Move::L, Move::R
+                ],
+                Piece::Bishop => vec![
+                    Move::UR, Move::UL, Move::DR, Move::DL
+                ],
+                Piece::Knight => vec![
+                    Move::KnUR, Move::KnDR, Move::KnUL, Move::KnDL
+                ],
+                Piece::Pawn => {
+                    if color == 'w' {
+                        vec![Move::U, Move::UL, Move::UR]
+                    } else {
+                        vec![Move::D, Move::DL, Move::DR]
+                    }
+                }
+                _ => vec![],
+            },
+            piece,
+            color,
+            first_move: true,
+            en_passant: false,
+        }
+    }
+}
+
+struct Game {
+    board: Vec<Vec<Square>>,
+    x,
+    y,
+    stdout,
+}
+
+impl Game {
+    fn new(stdout: stdout) -> Self {
+        Self {
+            board: Vec::new() 
+        }
+    }
+
+    fn init_board(&mut self) {
+        // First row
+        let mut row: Vec<Square> = Vec::new();
+        row.push(Square::new(Piece::Rook, 'b'));
+        row.push(Square::new(Piece::Knight, 'b'));
+        row.push(Square::new(Piece::Bishop, 'b'));
+        row.push(Square::new(Piece::Queen, 'b'));
+        row.push(Square::new(Piece::King, 'b'));
+        row.push(Square::new(Piece::Bishop, 'b'));
+        row.push(Square::new(Piece::Knight, 'b'));
+        row.push(Square::new(Piece::Rook, 'b'));
+        self.board.push(row);
+
+        row = Vec::new();
+        for _ in 0..8 {
+            row.push(Square::new(Piece::Pawn, 'b'));
+        }
+        self.board.push(row);
+
+        for _ in 0..4 {
+            row = Vec::new();
+            for _ in 0..8 {
+                row.push(Square::new(Piece::Empty, 'e'));
+            }
+            self.board.push(row);
+        }
+
+        row = Vec::new();
+        for _ in 0..8 {
+            row.push(Square::new(Piece::Pawn, 'w'));
+        }
+        self.board.push(row);
+
+        row = Vec::new();
+        row.push(Square::new(Piece::Rook, 'w'));
+        row.push(Square::new(Piece::Knight, 'w'));
+        row.push(Square::new(Piece::Bishop, 'w'));
+        row.push(Square::new(Piece::Queen, 'w'));
+        row.push(Square::new(Piece::King, 'w'));
+        row.push(Square::new(Piece::Bishop, 'w'));
+        row.push(Square::new(Piece::Knight, 'w'));
+        row.push(Square::new(Piece::Rook, 'w'));
+        self.board.push(row);
+    }
+    
+    fn get_bg_color(x: u16, y: u16) -> String {
+        let white = color::Bg(color::Rgb(200, 200, 200)).to_string();
+        let black = color::Bg(color::LightGreen).to_string();
+
+        if x % 2 == 0 {
+            if y % 2 == 0 {
+                white
+            } else {
+                black
+            }
+        } else {
+            if y % 2 == 0 {
+                black
+            } else {
+                white
+            }
+        }
+    }
+
+    fn print_initial_board(&self) {
+        for y in 0..8 {
+            for x in 0..8 {
+                if x == 0 {
+                    write!(
+                        stdout, "{}",
+
+                    );
+                }
+            }
+        }
+    }
+}
+
+fn main() {
+    let mut stdout = stdout().lock().into_raw_mode().unwrap();
+    write!(stdout, "{}{}", termion::clear::All, termion::cursor::Goto(1, 1)).unwrap();
+
+    for y in 0..8 {
+        for x in 0..8 {
+            if x == 0 {
+                write!(
+                    stdout, "{}", termion::cursor::Goto(x + 1, y + 1)
+                ).unwrap();
+
+                write!(
+                    stdout, "{}{}", 
+                    color::Bg(color::Blue), 8 - y
+                ).unwrap();
+            }
+
+            write!(
+                stdout, "{}{}", 
+                board_bg_color(x, y), 
+                piece_pos[y as usize][x as usize]
+            ).unwrap();
+        }
+    }
+
+    write!(
+        stdout,
+        "{}{} ",
+        color::Bg(color::LightBlue), 
+        termion::cursor::Goto(1, 9)
+    ).unwrap();
+
+    for i in 0..8 {
+        write!(
+            stdout, "{}", 
+            char::from_u32(i as u32 + 65).unwrap()
+        ).unwrap();
+    }
+
+    stdout.flush().unwrap();
+
+    let mut stdin = stdin();
+    let mut b = [0];
+    stdin.read(&mut b).unwrap();
+}
