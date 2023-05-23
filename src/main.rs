@@ -1,5 +1,6 @@
 extern crate clipboard;
 extern crate termion;
+extern crate clap;
 
 use termion::event::*;
 use termion::input::{MouseTerminal, TermRead};
@@ -13,7 +14,18 @@ use strum_macros::EnumIter;
 
 use clipboard::{ClipboardContext, ClipboardProvider};
 
+use clap::Parser;
+
 use std::io::{stdin, stdout, Read, Write};
+
+#[derive(Parser)]#[command(name = "MyApp")]
+#[command(about = "Play chess in your terminal", long_about = None)]
+#[command(author, version)]
+struct Cli {
+    /// Set position from given FEN string
+    #[arg(short, long)]
+    fen: Option<String>,
+}
 
 enum KeyCaptureState {
     Gameplay,
@@ -79,6 +91,7 @@ struct Game<R, W> {
     show_fen: bool,
     halfmove_clock: usize,
     fullmoves: usize,
+    initial_fen: Option<String>,
     stdout: W,
     stdin: R,
 }
@@ -180,7 +193,7 @@ impl Square {
     }
 }
 
-fn init_game<R: Read, W: Write>(stdout: W, stdin: R) {
+fn init_game<R: Read, W: Write>(stdout: W, stdin: R, fen: Option<String>) {
     let mut game = Game {
         board: Vec::new(),
         x: 0,
@@ -197,6 +210,7 @@ fn init_game<R: Read, W: Write>(stdout: W, stdin: R) {
         show_fen: false,
         halfmove_clock: 0,
         fullmoves: 1,
+        initial_fen: fen,
         stdout,
         stdin: stdin.events(),
     };
@@ -410,7 +424,7 @@ impl<R: Iterator<Item = Result<Event, std::io::Error>>, W: Write> Game<R, W> {
             fen += " -";
         } else {
             let en_passant_y = if self.turn == 0 {
-                self.en_passant[0][1] + 4 
+                self.en_passant[0][1] + 4
             } else {
                 self.en_passant[0][1] - 2
             };
@@ -1547,7 +1561,11 @@ impl<R: Iterator<Item = Result<Event, std::io::Error>>, W: Write> Game<R, W> {
         self.print_initial_board();
         write!(self.stdout, "{}", termion::cursor::Goto(2, 1)).unwrap();
         self.stdout.flush().unwrap();
-        self.fill_board_from_fen_string("rnbqkbnr/1pp1pppp/p3P3/8/2Pp4/8/PP1P1PPP/RNBQKBNR b KQkq c3 0 4".to_string());
+        if self.initial_fen.is_some() {
+            self.fill_board_from_fen_string(
+                self.initial_fen.clone().unwrap(),
+            );
+        }
         self.run_game();
         write!(
             self.stdout,
@@ -1561,7 +1579,9 @@ impl<R: Iterator<Item = Result<Event, std::io::Error>>, W: Write> Game<R, W> {
 }
 
 fn main() {
+    let args = Cli::parse();
     let stdout = MouseTerminal::from(stdout().lock().into_raw_mode().unwrap());
     let stdin = stdin().lock();
-    init_game(stdout, stdin);
+    init_game(stdout, stdin, args.fen); 
+
 }

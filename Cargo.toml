@@ -2,6 +2,7 @@
 name = "chess-term"
 version = "0.1.0"
 edition = "2021"
+authors = ["Andy Daurio-Sas"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -11,3 +12,4 @@ strum = "0.24"
 strum_macros = "0.24"
 rayon = "1.7.0"
 clipboard = "*"
+clap = { version = "4.2", features = ["derive"] }
