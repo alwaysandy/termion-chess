@@ -400,7 +400,7 @@ impl<R: Iterator<Item = Result<Event, std::io::Error>>, W: Write> Game<R, W> {
             castle_string += "q";
         }
 
-        if castle_string == "" {
+        if castle_string.is_empty() {
             castle_string += "-";
         }
 
@@ -409,15 +409,16 @@ impl<R: Iterator<Item = Result<Event, std::io::Error>>, W: Write> Game<R, W> {
         if self.en_passant.is_empty() {
             fen += " -";
         } else {
-            let en_passant_y;
-            if self.turn == 1 {
-                en_passant_y = self.y - 1;
+            let en_passant_y = if self.turn == 1 {
+                self.en_passant[0][1] - 1
             } else {
-                en_passant_y = 8 - self.y + 1;
-            }
+                8 - self.en_passant[0][1] + 1
+            };
             fen += &format!(
                 " {}{}",
-                &char::from_u32(self.x as u32 + 97).unwrap().to_string(),
+                &char::from_u32(self.en_passant[0][0] as u32 + 97)
+                    .unwrap()
+                    .to_string(),
                 &en_passant_y.to_string(),
             );
         }
@@ -448,8 +449,7 @@ impl<R: Iterator<Item = Result<Event, std::io::Error>>, W: Write> Game<R, W> {
 
     fn copy_fen_to_clipboard(&mut self) {
         let mut ctx: ClipboardContext = ClipboardProvider::new().unwrap();
-        ctx.set_contents(self.create_fen_string().to_owned())
-            .unwrap();
+        ctx.set_contents(self.create_fen_string()).unwrap();
         write!(
             self.stdout,
             "{}Copied FEN string to clipboard!",
@@ -457,6 +457,90 @@ impl<R: Iterator<Item = Result<Event, std::io::Error>>, W: Write> Game<R, W> {
         )
         .unwrap();
         self.stdout.flush().unwrap();
+    }
+
+    fn fill_board_from_fen_string(&mut self, fen: String) {
+        let contents: Vec<&str> = fen.split_whitespace().collect();
+        let pieces = contents[0];
+        let color = contents[1];
+        let castling_rights = contents[2];
+        let en_passant = contents[3];
+        let halfmove_clock = contents[4];
+        let fullmoves = contents[5];
+
+        let lines: Vec<&str> = pieces.split('/').collect();
+        for (y, line) in lines.into_iter().enumerate() {
+            let mut x = 0;
+            for c in line.chars() {
+                let piece: Piece = if c.is_ascii_digit() {
+                    Piece::Empty
+                } else {
+                    {
+                        match c.to_ascii_lowercase() {
+                            'k' => Piece::King,
+                            'q' => Piece::Queen,
+                            'r' => Piece::Rook,
+                            'b' => Piece::Bishop,
+                            'n' => Piece::Knight,
+                            'p' => Piece::Pawn,
+                            _ => Piece::Empty,
+                        }
+                    }
+                };
+
+                if piece == Piece::Empty {
+                    let i: usize = c.to_digit(10).unwrap() as usize;
+                    for _ in 0..i {
+                        self.place_piece(Piece::Empty, 2, x, y);
+                        x += 1;
+                    }
+                } else {
+                    let color: usize = if c.is_ascii_uppercase() { 0 } else { 1 };
+
+                    if piece == Piece::King {
+                        self.king_coords[color] = [x, y];
+                    }
+                    self.place_piece(piece, color, x, y);
+                    x += 1;
+                }
+            }
+        }
+
+        if color.starts_with('w') {
+            self.turn = 0;
+        } else {
+            self.turn = 1;
+        }
+
+        self.castling_rights = [[false, false], [false, false]];
+        for c in castling_rights.chars() {
+            match c {
+                'K' => self.castling_rights[0][0] = true,
+                'Q' => self.castling_rights[0][1] = true,
+                'k' => self.castling_rights[1][0] = true,
+                'q' => self.castling_rights[1][1] = true,
+                '-' => break,
+                _ => (),
+            }
+        }
+
+        let en_p_chars: Vec<char> = en_passant.chars().collect();
+        if en_p_chars[0] != '-' {
+            let x = en_p_chars[0].to_ascii_uppercase() as usize - 65;
+            let mut y = en_p_chars[1].to_digit(10).unwrap() as usize;
+
+            if self.turn == 0 {
+                y = 8 - y + 1;
+            } else {
+                y += 1;
+            }
+
+            self.en_passant.clear();
+            self.en_passant.push([x, y]);
+        }
+
+        self.halfmove_clock = halfmove_clock.parse::<usize>().unwrap();
+        self.fullmoves = fullmoves.parse::<usize>().unwrap();
     }
 
     // Valid move finder helper functions
