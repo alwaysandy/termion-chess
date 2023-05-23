@@ -409,17 +409,12 @@ impl<R: Iterator<Item = Result<Event, std::io::Error>>, W: Write> Game<R, W> {
         if self.en_passant.is_empty() {
             fen += " -";
         } else {
-            let en_passant_y = if self.turn == 1 {
-                self.en_passant[0][1] - 1
-            } else {
-                8 - self.en_passant[0][1] + 1
-            };
             fen += &format!(
                 " {}{}",
                 &char::from_u32(self.en_passant[0][0] as u32 + 97)
                     .unwrap()
                     .to_string(),
-                &en_passant_y.to_string(),
+                &self.en_passant[0][1].to_string(),
             );
         }
 
@@ -527,14 +522,7 @@ impl<R: Iterator<Item = Result<Event, std::io::Error>>, W: Write> Game<R, W> {
         let en_p_chars: Vec<char> = en_passant.chars().collect();
         if en_p_chars[0] != '-' {
             let x = en_p_chars[0].to_ascii_uppercase() as usize - 65;
-            let mut y = en_p_chars[1].to_digit(10).unwrap() as usize;
-
-            if self.turn == 0 {
-                y = 8 - y + 1;
-            } else {
-                y += 1;
-            }
-
+            let y = en_p_chars[1].to_digit(10).unwrap() as usize;
             self.en_passant.clear();
             self.en_passant.push([x, y]);
         }
@@ -791,8 +779,8 @@ impl<R: Iterator<Item = Result<Event, std::io::Error>>, W: Write> Game<R, W> {
                                 }
 
                                 if !self.en_passant.is_empty()
-                                    && self.en_passant[0][0] as isize == tmp_x
-                                    && self.en_passant[0][1] == self.y
+                                    && self.en_passant[0][0] == tmp_x as usize
+                                    && self.en_passant[0][1] == tmp_y as usize
                                 {
                                     moves.push([tmp_x as usize, tmp_y as usize]);
                                 }
@@ -961,11 +949,7 @@ impl<R: Iterator<Item = Result<Event, std::io::Error>>, W: Write> Game<R, W> {
             return;
         }
 
-        if self.x == sel_x {
-            return;
-        }
-
-        if self.board[self.y][self.x].piece != Piece::Empty {
+        if self.x != self.en_passant[0][0] || self.y != self.en_passant[0][1] {
             return;
         }
 
@@ -1161,15 +1145,13 @@ impl<R: Iterator<Item = Result<Event, std::io::Error>>, W: Write> Game<R, W> {
             return;
         }
 
-        if self.turn == 0 {
-            if sel_y != 6 || self.y != 4 {
-                return;
+        if (self.y as isize - sel_y as isize).abs() == 2 {
+            if self.turn == 0 {
+                self.en_passant.push([self.x, self.y + 1]);
+            } else {
+                self.en_passant.push([self.x, self.y - 1]);
             }
-        } else if sel_y != 1 || self.y != 3 {
-            return;
         }
-
-        self.en_passant.push([self.x, self.y]);
     }
 
     fn update_castling_rights(&mut self) {
@@ -1555,6 +1537,7 @@ impl<R: Iterator<Item = Result<Event, std::io::Error>>, W: Write> Game<R, W> {
         self.print_initial_board();
         write!(self.stdout, "{}", termion::cursor::Goto(2, 1)).unwrap();
         self.stdout.flush().unwrap();
+        //self.fill_board_from_fen_string("4Q3/3N2p1/8/p4kPp/P4p1P/8/1P2PPB1/2R1K3 w - - 2 33".to_string());
         self.run_game();
         write!(
             self.stdout,
