@@ -409,12 +409,17 @@ impl<R: Iterator<Item = Result<Event, std::io::Error>>, W: Write> Game<R, W> {
         if self.en_passant.is_empty() {
             fen += " -";
         } else {
+            let en_passant_y = if self.turn == 0 {
+                self.en_passant[0][1] + 4 
+            } else {
+                self.en_passant[0][1] - 2
+            };
             fen += &format!(
                 " {}{}",
                 &char::from_u32(self.en_passant[0][0] as u32 + 97)
                     .unwrap()
                     .to_string(),
-                &self.en_passant[0][1].to_string(),
+                &en_passant_y.to_string(),
             );
         }
 
@@ -522,7 +527,12 @@ impl<R: Iterator<Item = Result<Event, std::io::Error>>, W: Write> Game<R, W> {
         let en_p_chars: Vec<char> = en_passant.chars().collect();
         if en_p_chars[0] != '-' {
             let x = en_p_chars[0].to_ascii_uppercase() as usize - 65;
-            let y = en_p_chars[1].to_digit(10).unwrap() as usize;
+            let mut y = en_p_chars[1].to_digit(10).unwrap() as usize;
+            if self.turn == 0 {
+                y -= 4;
+            } else {
+                y += 2;
+            }
             self.en_passant.clear();
             self.en_passant.push([x, y]);
         }
@@ -1537,7 +1547,7 @@ impl<R: Iterator<Item = Result<Event, std::io::Error>>, W: Write> Game<R, W> {
         self.print_initial_board();
         write!(self.stdout, "{}", termion::cursor::Goto(2, 1)).unwrap();
         self.stdout.flush().unwrap();
-        //self.fill_board_from_fen_string("4Q3/3N2p1/8/p4kPp/P4p1P/8/1P2PPB1/2R1K3 w - - 2 33".to_string());
+        self.fill_board_from_fen_string("rnbqkbnr/1pp1pppp/p3P3/8/2Pp4/8/PP1P1PPP/RNBQKBNR b KQkq c3 0 4".to_string());
         self.run_game();
         write!(
             self.stdout,
